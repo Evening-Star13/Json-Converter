@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSON to CSV Converter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Drop overlay */
+    #drop-zone {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    body.drag-over #drop-zone {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* Perfect hamburger menu - all lines equal & centered */
+    #menu-button svg {
+      width: 28px;
+      height: 28px;
+    }
+    #menu-button .line {
+      @apply w-7 h-0.5 bg-current rounded-full;
+      transition: all 0.3s ease;
+    }
+
+    /* Toast notification */
+    #toast {
+      visibility: hidden;
+      min-width: 320px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      text-align: center;
+      border-radius: 16px;
+      padding: 18px 32px;
+      position: fixed;
+      z-index: 1000;
+      left: 50%;
+      bottom: 40px;
+      transform: translateX(-50%);
+      font-weight: 600;
+      font-size: 1.05rem;
+      box-shadow: 0 20px 40px rgba(16,185,129,0.4);
+      opacity: 0;
+      transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+      bottom: 60px;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+  <!-- Toast -->
+  <div id="toast" class="flex items-center justify-center gap-3">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+    </svg>
+    Converted successfully!
+  </div>
+
+  <!-- Drop Overlay -->
+  <div id="drop-zone" class="fixed inset-0 z-50 flex items-center justify-center bg-indigo-600/95 backdrop-blur-sm">
+    <div class="text-center text-white">
+      <svg class="w-24 h-24 mx-auto mb-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5.5 0 1115.9 6L16 6a5 5 0 011 9.9v1m-7-5v5m-3-3h6"/>
+      </svg>
+      <p class="text-4xl font-bold mt-4">Drop file anywhere</p>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10">
+
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
+      <h1 class="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+        JSON to CSV Converter
+      </h1>
+
+      <div class="flex items-center gap-3">
+        <!-- Theme Toggle -->
+        <button id="theme-toggle" class="p-3 rounded-xl bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition">
+          <svg id="sun" class="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.708.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+          </svg>
+          <svg id="moon" class="hidden w-6 h-6 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+          </svg>
+        </button>
+
+        <!-- Hamburger Menu -->
+        <button id="menu-button" class="p-3 rounded-xl bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition">
+          <svg viewBox="0 0 28 28" fill="none" stroke="currentColor">
+            <line class="line" x1="6" y1="10" x2="22" y2="10"/>
+            <line class="line" x1="6" y1="14" x2="22" y2="14"/>
+            <line class="line" x1="6" y1="18" x2="22" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Dropdown Menu -->
+    <div id="dropdown-menu" class="absolute right-4 sm:right-10 top-24 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 origin-top-right scale-0 transition-transform duration-200">
+      <div class="p-4 space-y-1">
+        <div class="px-4 py-2 text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Import</div>
+        <button id="import-json-btn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">Load JSON File</button>
+        <button id="import-csv-btn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">Load CSV File</button>
+        <div class="h-px bg-gray-200 dark:bg-gray-700 my-2"></div>
+        <div class="px-4 py-2 text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Export</div>
+        <button id="export-json-btn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">Save as JSON</button>
+        <button id="export-csv-btn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">Save as CSV</button>
+      </div>
+    </div>
+
+    <!-- Mode Switch -->
+    <div class="flex justify-center mb-12">
+      <div class="inline-flex rounded-2xl bg-gray-200 dark:bg-gray-800 p-1.5 shadow-lg">
+        <button id="mode-json-to-csv" class="px-8 py-4 rounded-xl font-semibold text-lg bg-indigo-600 text-white shadow-md">JSON to CSV</button>
+        <button id="mode-csv-to-json" class="px-8 py-4 rounded-xl font-semibold text-lg text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700 transition">CSV to JSON</button>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+      <!-- Input Panel -->
+      <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10">
+        <div class="p-6 lg:p-8">
+          <h2 id="input-heading" class="text-3xl font-bold mb-6 text-indigo-600 dark:text-indigo-400">Input JSON</h2>
+          <textarea id="input-data" rows="20" placeholder="Paste or drop your data here..." class="w-full p-5 bg-gray-100 dark:bg-gray-900 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none font-mono text-sm resize-none"></textarea>
+          <div class="mt-6 flex gap-4">
+            <button id="convert-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition shadow-lg">Convert Now</button>
+            <button id="clear-btn" class="px-8 bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output Panel -->
+      <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10">
+        <div class="p-6 lg:p-8">
+          <h2 id="output-heading" class="text-3xl font-bold mb-6 text-indigo-600 dark:text-indigo-400">Output CSV</h2>
+          <textarea id="output-data" rows="12" readonly placeholder="Result will appear here..." class="w-full p-5 bg-gray-100 dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-600 font-mono text-sm resize-none mb-6"></textarea>
+
+          <div id="table-preview" class="max-h-96 overflow-auto rounded-2xl border border-gray-300 dark:border-gray-700 hidden mb-6">
+            <table class="w-full">
+              <thead class="sticky top-0 bg-gray-50 dark:bg-gray-900 border-b-2 border-gray-300 dark:border-gray-700">
+                <tr id="table-header"></tr>
+              </thead>
+              <tbody id="table-body" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+            </table>
+          </div>
+
+          <div class="flex justify-between items-center">
+            <div id="stats" class="text-lg font-medium text-gray-600 dark:text-gray-400">Ready</div>
+            <div class="flex gap-4">
+              <button id="copy-btn" class="px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition">Copy</button>
+              <button id="download-btn" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition">Download</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="file-input" class="hidden" accept=".json,.csv">
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+   const input = document.getElementById('input-data');
+   const output = document.getElementById('output-data');
+   const convertBtn = document.getElementById('convert-btn');
+   const clearBtn = document.getElementById('clear-btn');
+   const copyBtn = document.getElementById('copy-btn');
+   const downloadBtn = document.getElementById('download-btn');
+   const modeJsonCsv = document.getElementById('mode-json-to-csv');
+   const modeCsvJson = document.getElementById('mode-csv-to-json');
+   const inputHeading = document.getElementById('input-heading');
+   const outputHeading = document.getElementById('output-heading');
+   const stats = document.getElementById('stats');
+   const tablePreview = document.getElementById('table-preview');
+   const tableHeader = document.getElementById('table-header');
+   const tableBody = document.getElementById('table-body');
+   const menuBtn = document.getElementById('menu-button');
+   const dropdown = document.getElementById('dropdown-menu');
+   const fileInput = document.getElementById('file-input');
+   const themeToggle = document.getElementById('theme-toggle');
+   const sun = document.getElementById('sun');
+   const moon = document.getElementById('moon');
+   const toast = document.getElementById('toast');
+
+   let currentMode = 'json-to-csv';
+
+   // Theme Toggle
+   const savedTheme = localStorage.getItem('theme');
+   if (savedTheme === 'light' || (!savedTheme && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+     document.documentElement.classList.remove('dark');
+     sun.classList.remove('hidden');
+     moon.classList.add('hidden');
+   } else {
+     sun.classList.add('hidden');
+     moon.classList.remove('hidden');
+   }
+
+   themeToggle.onclick = () => {
+     document.documentElement.classList.toggle('dark');
+     const isDark = document.documentElement.classList.contains('dark');
+     localStorage.setItem('theme', isDark ? 'dark' : 'light');
+     sun.classList.toggle('hidden', isDark);
+     moon.classList.toggle('hidden', !isDark);
+   };
+
+   // Toast
+   const showToast = () => {
+     toast.classList.add('show');
+     setTimeout(() => toast.classList.remove('show'), 2500);
+   };
+
+   // Conversion Functions
+   const jsonToCsv = (json) => {
+     const arr = JSON.parse(json);
+     if (!Array.isArray(arr) || arr.length === 0) throw new Error();
+     const headers = Object.keys(arr[0]);
+     const rows = arr.map(obj => headers.map(h => {
+       let v = obj[h] ?? '';
+       if (typeof v === 'object' && v !== null) v = JSON.stringify(v);
+       v = String(v);
+       if (v.includes('"') || v.includes(',') || v.includes('\n')) v = '"' + v.replace(/"/g, '""') + '"';
+       return v;
+     }).join(','));
+     return [headers.join(','), ...rows].join('\n');
+   };
+
+   const csvToJson = (csv, pretty = true) => {
+     const lines = csv.trim().split('\n');
+     if (lines.length < 2) return '[]';
+     const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+     const result = [];
+     for (let i = 1; i < lines.length; i++) {
+       const values = [];
+       let field = '', inQuote = false;
+       for (let j = 0; j < lines[i].length; j++) {
+         if (lines[i][j] === '"' && lines[i][j+1] === '"') { field += '"'; j++; }
+         else if (lines[i][j] === '"') inQuote = !inQuote;
+         else if (lines[i][j] === ',' && !inQuote) { values.push(field.trim()); field = ''; }
+         else field += lines[i][j];
+       }
+       if (field) values.push(field.trim());
+       if (values.length === headers.length) {
+         const obj = {};
+         headers.forEach((h, idx) => obj[h] = values[idx] || '');
+         result.push(obj);
+       }
+     }
+     return JSON.stringify(result, null, pretty ? 2 : undefined);
+   };
+
+   // Table Preview
+   const updateTable = (csv) => {
+     tableHeader.innerHTML = '';
+     tableBody.innerHTML = '';
+     tablePreview.classList.add('hidden');
+     if (currentMode !== 'json-to-csv' || !csv) return;
+
+     const lines = csv.trim().split('\n');
+     if (lines.length < 2) return;
+
+     const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').replace(/""/g, '"'));
+     headers.forEach(h => {
+       const th = document.createElement('th');
+       th.textContent = h || '(empty)';
+       th.className = 'px-6 py-4 text-left font-semibold text-indigo-600 dark:text-indigo-400';
+       tableHeader.appendChild(th);
+     });
+
+     for (let i = 1; i < lines.length; i++) {
+       const values = lines[i].split(',').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+       const tr = document.createElement('tr');
+       tr.className = 'hover:bg-gray-50 dark:hover:bg-gray-800';
+       values.forEach(v => {
+         const td = document.createElement('td');
+         td.textContent = v;
+         td.className = 'px-6 py-3 border-t border-gray-200 dark:border-gray-700';
+         tr.appendChild(td);
+       });
+       tableBody.appendChild(tr);
+     }
+     tablePreview.classList.remove('hidden');
+     stats.textContent = `${lines.length - 1} rows × ${headers.length} columns`;
+   };
+
+   // Convert
+   const convert = () => {
+     const val = input.value.trim();
+     output.value = '';
+     tablePreview.classList.add('hidden');
+     stats.textContent = 'Converting...';
+
+     if (!val) {
+       stats.textContent = 'Paste or drop data';
+       return;
+     }
+
+     try {
+       if (currentMode === 'json-to-csv') {
+         output.value = jsonToCsv(val);
+         downloadBtn.dataset.ext = 'csv';
+         updateTable(output.value);
+       } else {
+         output.value = csvToJson(val, true);
+         downloadBtn.dataset.ext = 'json';
+       }
+       stats.textContent = 'Converted!';
+       showToast();
+     } catch (e) {
+       stats.textContent = 'Invalid format';
+       output.value = '';
+     }
+   };
+
+   // Mode Switch
+   const switchMode = (mode) => {
+     currentMode = mode;
+     const isJsonToCsv = mode === 'json-to-csv';
+     modeJsonCsv.classList.toggle('bg-indigo-600', isJsonToCsv);
+     modeJsonCsv.classList.toggle('text-white', isJsonToCsv);
+     modeCsvJson.classList.toggle('bg-indigo-600', !isJsonToCsv);
+     modeCsvJson.classList.toggle('text-white', !isJsonToCsv);
+
+     inputHeading.textContent = isJsonToCsv ? 'Input JSON' : 'Input CSV';
+     outputHeading.textContent = isJsonToCsv ? 'Output CSV' : 'Output JSON';
+
+     if (input.value.trim()) convert();
+   };
+
+   // Event Listeners
+   modeJsonCsv.onclick = () => switchMode('json-to-csv');
+   modeCsvJson.onclick = () => switchMode('csv-to-json');
+   convertBtn.onclick = convert;
+   clearBtn.onclick = () => { input.value = output.value = ''; tablePreview.classList.add('hidden'); stats.textContent = 'Cleared'; };
+   copyBtn.onclick = () => { navigator.clipboard.writeText(output.value); stats.textContent = 'Copied!'; setTimeout(() => stats.textContent = 'Ready', 2000); };
+   downloadBtn.onclick = () => {
+     const blob = new Blob([output.value], { type: downloadBtn.dataset.ext === 'csv' ? 'text/csv' : 'application/json' });
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a');
+     a.href = url;
+     a.download = `data.${downloadBtn.dataset.ext || 'txt'}`;
+     a.click();
+     URL.revokeObjectURL(url);
+   };
+
+   // Drag & Drop
+   document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drag-over'); });
+   document.addEventListener('dragleave', () => document.body.classList.remove('drag-over'));
+   document.addEventListener('drop', e => {
+     e.preventDefault();
+     document.body.classList.remove('drag-over');
+     const file = e.dataTransfer.files[0];
+     if (file) {
+       const reader = new FileReader();
+       reader.onload = () => { input.value = reader.result; convert(); };
+       reader.readAsText(file);
+     }
+   });
+
+   // File Import/Export
+   fileInput.onchange = e => {
+     const file = e.target.files[0];
+     if (file) {
+       const reader = new FileReader();
+       reader.onload = () => { input.value = reader.result; convert(); };
+       reader.readAsText(file);
+     }
+   };
+
+   document.getElementById('import-json-btn').onclick = () => { fileInput.accept = '.json'; fileInput.click(); };
+   document.getElementById('import-csv-btn').onclick = () => { fileInput.accept = '.csv'; fileInput.click(); };
+   document.getElementById('export-json-btn').onclick = () => {
+     const data = currentMode === 'json-to-csv' ? csvToJson(output.value) : output.value;
+     const blob = new Blob([data], {type: 'application/json'});
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a'); a.href = url; a.download = 'data.json'; a.click(); URL.revokeObjectURL(url);
+   };
+   document.getElementById('export-csv-btn').onclick = () => {
+     const data = currentMode === 'csv-to-json' ? jsonToCsv(JSON.parse(output.value)) : output.value;
+     const blob = new Blob([data], {type: 'text/csv'});
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a'); a.href = url; a.download = 'data.csv'; a.click(); URL.revokeObjectURL(url);
+   };
+
+   // Menu Toggle
+   menuBtn.onclick = e => {
+     e.stopPropagation();
+     dropdown.classList.toggle('scale-0');
+     dropdown.classList.toggle('scale-100');
+   };
+   document.onclick = e => {
+     if (!menuBtn.contains(e.target) && !dropdown.contains(e.target)) {
+       dropdown.classList.add('scale-0');
+       dropdown.classList.remove('scale-100');
+     }
+   };
+
+   // Live conversion
+   input.oninput = convert;
+
+   // Init
+   switchMode('json-to-csv');
+ });
+  </script>
+</body>
+</html>
